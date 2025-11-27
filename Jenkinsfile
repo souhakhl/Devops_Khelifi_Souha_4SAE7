@@ -1,30 +1,43 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKERHUB_USER        = 'souhakhelifi'
+        IMAGE_NAME            = "${DOCKERHUB_USER}/student-management"
+        DOCKERHUB_CREDENTIALS = 'dockerhub-souha'
+    }
+
     stages {
-        stage('Récupérer le code') {
+        stage('Création image Docker') {
             steps {
-                echo 'Je récupère le code GitHub'
+                sh 'docker build -t ${IMAGE_NAME}:latest .'
+                sh 'docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${BUILD_NUMBER}'
             }
         }
 
-        stage('Construire le JAR') {
+        stage('Push de l\'image sur DockerHub') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                withCredentials([usernamePassword(
+                    credentialsId: '${DOCKERHUB_CREDENTIALS}',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login --username "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                    '''
+                }
             }
         }
+    }
 
-        stage('Créer l’image Docker') {
-            steps {
-                sh 'docker build -t souhakhelifi/student-management:latest .'
-            }
-        }
-
-        stage('Envoyer sur Docker Hub') {
-            steps {
-                sh 'echo "$DOCKER_PASS" | docker login -u souhakhelifi --password-stdin'
-                sh 'docker push souhakhelifi/student-management:latest'
-            }
+    post {
+        always {
+            sh '''
+                docker rmi ${IMAGE_NAME}:latest || true
+                docker rmi ${IMAGE_NAME}:${BUILD_NUMBER} || true
+            '''
         }
     }
 }
