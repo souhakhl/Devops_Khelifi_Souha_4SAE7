@@ -1,6 +1,8 @@
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY . .
+# Cette ligne corrige le problème de permission
+RUN chmod +x mvnw
 RUN ./mvnw clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
